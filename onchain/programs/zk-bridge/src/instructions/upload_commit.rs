@@ -19,7 +19,11 @@ pub struct UploadCommit<'info> {
         init_if_needed,
         payer = prover,
         space = 8 + Commit::INIT_SPACE + args.commit_size as usize,
-        seeds = [COMMIT_SEED_PREFIX, platform.id.as_ref(), prover.key().as_ref()],
+        seeds = [
+            COMMIT_SEED_PREFIX,
+            platform.id.as_ref(),
+            prover.key().as_ref(),
+        ],
         bump
     )]
     pub commit: Account<'info, Commit>,

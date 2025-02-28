@@ -2,8 +2,7 @@ use crate::constants::*;
 use crate::errors::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_lang::system_program;
-use anchor_lang::system_program::Transfer;
+use anchor_lang::system_program::{transfer, Transfer};
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct AddRampTxArgs {
@@ -18,6 +17,9 @@ pub struct AddRampTx<'info> {
     pub ramper: Signer<'info>,
     #[account(
         mut,
+        realloc = 8 + Platform::INIT_SPACE + (platform.ramp_txs.len() + 1) * Ramp::INIT_SPACE,
+        realloc::payer = ramper,
+        realloc::zero = false,
         seeds = [
             PLATFORM_SEED_PREFIX,
             platform.id.as_ref(),
@@ -52,30 +54,13 @@ impl AddRampTx<'_> {
         if args.is_onramp {
             ctx.accounts.platform.deposit += args.amount;
 
-            system_program::transfer(
+            transfer(
                 CpiContext::new(
                     ctx.accounts.system_program.to_account_info(),
                     Transfer {
                         from: ctx.accounts.ramper.to_account_info(),
                         to: ctx.accounts.platform.to_account_info(),
                     },
-                ),
-                args.amount,
-            )?;
-
-            let seeds = &[
-                PLATFORM_SEED_PREFIX,
-                ctx.accounts.platform.id.as_ref(),
-                &[ctx.accounts.platform.bump],
-            ];
-            system_program::transfer(
-                CpiContext::new_with_signer(
-                    ctx.accounts.system_program.to_account_info(),
-                    Transfer {
-                        from: ctx.accounts.ramper.to_account_info(),
-                        to: ctx.accounts.platform.to_account_info(),
-                    },
-                    &[&seeds[..]],
                 ),
                 args.amount,
             )?;

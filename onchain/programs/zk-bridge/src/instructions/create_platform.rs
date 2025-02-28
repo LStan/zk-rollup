@@ -18,7 +18,10 @@ pub struct CreatePlatform<'info> {
         init,
         payer = sequencer,
         space = 8 + Platform::INIT_SPACE,
-        seeds = [PLATFORM_SEED_PREFIX, args.id.as_ref()],
+        seeds = [
+            PLATFORM_SEED_PREFIX,
+            args.id.as_ref(),
+        ],
         bump
     )]
     pub platform: Account<'info, Platform>,

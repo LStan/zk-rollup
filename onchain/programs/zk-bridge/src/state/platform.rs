@@ -7,7 +7,7 @@ pub struct Platform {
     pub sequencer: Pubkey,
     pub id: Pubkey,
     pub last_state_hash: [u8; 32],
-    #[max_len(30)]
+    #[max_len(0)]
     pub ramp_txs: Vec<RampTx>,
     pub deposit: u64,
     pub withdraw: u64,

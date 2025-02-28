@@ -27,7 +27,11 @@ pub struct Prove<'info> {
     #[account(mut)]
     pub prover: Signer<'info>,
     #[account(
-        seeds = [COMMIT_SEED_PREFIX, platform.id.as_ref(), prover.key().as_ref()],
+        seeds = [
+            COMMIT_SEED_PREFIX,
+            platform.id.as_ref(),
+            prover.key().as_ref(),
+        ],
         bump = commit.bump
     )]
     pub commit: Account<'info, Commit>,
