@@ -25,12 +25,6 @@ pub type ExecutionOutput = Hash;
 #[derive(Deserialize, Serialize, Debug)]
 pub struct RollupState(pub Vec<(Pubkey, Account)>); // Change Account to AccountSharedData ?
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct CommittedValues {
-    pub input: ExecutionInput,
-    pub output: ExecutionOutput,
-}
-
 // Temporary function used before adding the merklized state
 pub fn hash_state(output: RollupState) -> Hash {
     let mut data = Vec::new();
@@ -39,4 +33,46 @@ pub fn hash_state(output: RollupState) -> Hash {
         data.extend_from_slice(&bincode::serialize(account).unwrap());
     }
     hashv(&[data.as_slice()])
+}
+
+impl Into<onchain_types::RollupState> for RollupState {
+    fn into(self) -> onchain_types::RollupState {
+        let data = self
+            .0
+            .iter()
+            .map(|(pk, account)| {
+                (
+                    onchain_types::Pubkey(pk.to_bytes()),
+                    onchain_types::Account {
+                        lamports: account.lamports,
+                        data: account.data.to_vec(),
+                        owner: onchain_types::Pubkey(account.owner.to_bytes()),
+                        executable: account.executable,
+                        rent_epoch: account.rent_epoch,
+                    },
+                )
+            })
+            .collect();
+        onchain_types::RollupState(data)
+    }
+}
+
+impl Into<onchain_types::RampTx> for RampTx {
+    fn into(self) -> onchain_types::RampTx {
+        onchain_types::RampTx {
+            is_onramp: self.is_onramp,
+            user: onchain_types::Pubkey(self.user.to_bytes()),
+            amount: self.amount,
+        }
+    }
+}
+
+impl Into<onchain_types::ExecutionInput> for ExecutionInput {
+    fn into(self) -> onchain_types::ExecutionInput {
+        onchain_types::ExecutionInput {
+            accounts: self.accounts.into(),
+            txs: bincode::serialize(&self.txs).unwrap(),
+            ramp_txs: self.ramp_txs.into_iter().map(|r| r.into()).collect(),
+        }
+    }
 }

@@ -1,8 +1,9 @@
 #![no_main]
 sp1_zkvm::entrypoint!(main);
 
+use onchain_types::CommittedValues;
 use svm_runner::runner;
-use svm_runner_types::{hash_state, CommittedValues, ExecutionInput};
+use svm_runner_types::{hash_state, ExecutionInput};
 
 pub fn main() {
     let input = sp1_zkvm::io::read::<ExecutionInput>();
@@ -11,8 +12,8 @@ pub fn main() {
 
     // Commit to the input and output
     let commit = CommittedValues {
-        input,
-        output: hash_state(output),
+        input: input.into(),
+        output: hash_state(output).to_bytes(),
     };
     sp1_zkvm::io::commit(&commit);
 }

@@ -7,3 +7,4 @@ edition = "2021"
 sp1-zkvm = { workspace = true }
 svm-runner = { workspace = true }
 svm-runner-types = { workspace = true }
+onchain-types = { workspace = true }

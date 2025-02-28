@@ -1,12 +1,9 @@
 use anchor_lang::prelude::*;
-// use runner_types::CommittedValues;
-// use verifier::verify_proof;
-// use anchor_spl::associated_token::AssociatedToken;
-// use anchor_spl::token::*;
+use onchain_types::CommittedValues;
 
+use crate::constants::*;
 use crate::errors::*;
 use crate::state::*;
-use crate::constants::*;
 
 /// Derived as follows:
 ///
@@ -16,7 +13,8 @@ use crate::constants::*;
 /// let vkey_hash = vk.bytes32();
 /// ```
 const ZK_BRIDGE_VKEY_HASH: &str =
-    "0x00508568011475c128053532cd7c60b9791f6edd5437e094c038a7445fba383d";
+    "0x00e6c119f877ce29467d89e62b47f983177b85fddbd90ce988b6303b2f5d7f9b";
+// "0x00508568011475c128053532cd7c60b9791f6edd5437e094c038a7445fba383d";
 
 // #[derive(AnchorDeserialize, AnchorSerialize)]
 // pub struct SP1Groth16Proof {
@@ -29,11 +27,7 @@ pub struct Prove<'info> {
     #[account(mut)]
     pub prover: Signer<'info>,
     #[account(
-        seeds = [
-            COMMIT_SEED_PREFIX,
-            platform.id.as_ref(),
-            prover.key().as_ref(),
-        ],
+        seeds = [COMMIT_SEED_PREFIX, platform.id.as_ref(), prover.key().as_ref()],
         bump = commit.bump
     )]
     pub commit: Account<'info, Commit>,
@@ -51,48 +45,37 @@ pub struct Prove<'info> {
 
 impl Prove<'_> {
     pub fn handle(ctx: Context<Self>, proof: Vec<u8>) -> Result<()> {
-        msg!("1");
-        // Taking data from an account because it's too big to fit in an instruction.
-        // let groth16_proof = SP1Groth16Proof::try_from_slice(&ctx.accounts.proof.data)
-        //     .map_err(|_| PlatformError::InvalidProofData)?;
-        msg!("2");
-
         let vk = sp1_solana::GROTH16_VK_4_0_0_RC3_BYTES;
-        sp1_solana::verify_proof(
-            &proof,
-            &ctx.accounts.commit.data,
-            ZK_BRIDGE_VKEY_HASH,
-            vk,
-        )
-        .map_err(|_| PlatformError::InvalidProof)?;
-        msg!("3");
+        sp1_solana::verify_proof(&proof, &ctx.accounts.commit.data, ZK_BRIDGE_VKEY_HASH, vk)
+            .map_err(|_| PlatformError::InvalidProof)?;
 
-        msg!("commit data: {:?}", ctx.accounts.commit.data);
-        msg!("commit data len: {}", ctx.accounts.commit.data.len());
+        let committed_values: CommittedValues =
+            bincode::deserialize(ctx.accounts.commit.data.as_slice()).unwrap();
 
-        msg!("4");
+        // msg!("commit data: {:?}", ctx.accounts.commit.data);
+        // msg!("commit data len: {}", ctx.accounts.commit.data.len());
 
         // Check that ramps txs match the ones in the platform
         // Currently only check the count, could be improved to a hash of all txs
-        // if values.0.ramp_txs.len() != ctx.accounts.platform.ramp_txs.len() {
-        //     return Err(PlatformError::MissingRampTxs.into());
-        // }
+        if committed_values.input.ramp_txs.len() != ctx.accounts.platform.ramp_txs.len() {
+            return Err(PlatformError::MissingRampTxs.into());
+        }
 
         // Empty pending ramp txs
         ctx.accounts.platform.ramp_txs = vec![];
 
         // This can currently brick the platform, there should be a limit in number of ramp txs
-        // for ramp_tx in values
-        //     .0
-        //     .ramp_txs
-        //     .iter()
-        //     .filter(|ramp_tx| !ramp_tx.is_onramp)
-        // {
-        //     ctx.accounts.platform.withdraw += ramp_tx.amount;
-        // }
+        for ramp_tx in committed_values
+            .input
+            .ramp_txs
+            .iter()
+            .filter(|ramp_tx| !ramp_tx.is_onramp)
+        {
+            ctx.accounts.platform.withdraw += ramp_tx.amount;
+        }
 
         // Update the platform state
-        // ctx.accounts.platform.last_state_hash = values.1.to_bytes();
+        ctx.accounts.platform.last_state_hash = committed_values.output;
 
         Ok(())
     }

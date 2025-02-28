@@ -12,6 +12,7 @@ solana-sdk = { workspace = true }
 sp1-sdk = { workspace = true }
 svm-runner = { workspace = true }
 svm-runner-types = { workspace = true }
+onchain-types = { workspace = true }
 
 [build-dependencies]
 sp1-build = { workspace = true }

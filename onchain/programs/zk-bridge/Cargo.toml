@@ -24,6 +24,7 @@ anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }
 sp1-solana = { git = "https://github.com/succinctlabs/sp1-solana", branch = "master" }
 bincode = "1.3.3"
 serde = { version = "1.0.217", features = ["derive"] }
+onchain-types = { path = "../../../crates/onchain-types" }
 
 [lints.rust.unexpected_cfgs]
 level = "warn"

@@ -1,6 +1,6 @@
+use crate::constants::*;
 use crate::errors::*;
 use crate::state::*;
-use crate::constants::*;
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 use anchor_lang::system_program::Transfer;
@@ -53,11 +53,14 @@ impl AddRampTx<'_> {
             ctx.accounts.platform.deposit += args.amount;
 
             system_program::transfer(
-                CpiContext::new(ctx.accounts.system_program.to_account_info(), Transfer {
-                    from: ctx.accounts.ramper.to_account_info(),
-                    to: ctx.accounts.platform.to_account_info(),
-                }),
-                args.amount
+                CpiContext::new(
+                    ctx.accounts.system_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.ramper.to_account_info(),
+                        to: ctx.accounts.platform.to_account_info(),
+                    },
+                ),
+                args.amount,
             )?;
 
             let seeds = &[
@@ -72,9 +75,9 @@ impl AddRampTx<'_> {
                         from: ctx.accounts.ramper.to_account_info(),
                         to: ctx.accounts.platform.to_account_info(),
                     },
-                    &[&seeds[..]]
+                    &[&seeds[..]],
                 ),
-                args.amount
+                args.amount,
             )?;
         } else {
             ctx.accounts.platform.withdraw += args.amount;

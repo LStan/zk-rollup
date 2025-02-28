@@ -7,17 +7,17 @@ import * as fs from "fs";
 import * as borsh from "borsh";
 
 // Define the structure of OnChainProof in TypeScript
-class OnChainProof {
-  publicValues: Uint8Array;
-  proof: Uint8Array;
+// class OnChainProof {
+//   publicValues: Uint8Array;
+//   proof: Uint8Array;
 
-  static schema: borsh.Schema = {
-    struct: {
-      publicValues: { array: { type: "u8" } },
-      proof: { array: { type: "u8" } },
-    },
-  };
-}
+//   static schema: borsh.Schema = {
+//     struct: {
+//       publicValues: { array: { type: "u8" } },
+//       proof: { array: { type: "u8" } },
+//     },
+//   };
+// }
 
 describe("zk-bridge", () => {
   // Configure the client to use the local cluster.
@@ -39,19 +39,26 @@ describe("zk-bridge", () => {
   const RAMP_SEED_PREFIX = getConstant(program.idl, "rampSeedPrefix");
 
   // Read the file containing the serialized data
-  const filePath = "../script/onchain-proof.bin";
-  const fileData = fs.readFileSync(filePath);
+  let filePath = "../script/onchain-commit.bin";
+  const commitData = Uint8Array.from(fs.readFileSync(filePath));
+  filePath = "../script/onchain-proof.bin";
+  const proofData = Uint8Array.from(fs.readFileSync(filePath));
 
-  // Deserialize the data using borsh
-  const onchainProof = borsh.deserialize(
-    OnChainProof.schema,
-    fileData
-  ) as OnChainProof;
-  // const onchainProof = borsh.deserialize;
+  // console.log("Commit Data Length:", commitData.length);
+  // console.log("Commit Data:", commitData);
+  // console.log("File Data Length:", proof.length);
+  // console.log("File Data:", proof);
 
-  // console.log("OnChainProof:", onchainProof);
-  console.log("Public Values Length:", onchainProof.publicValues.length);
-  console.log("Proof Length:", onchainProof.proof.length);
+  // // Deserialize the data using borsh
+  // const onchainProof = borsh.deserialize(
+  //   OnChainProof.schema,
+  //   fileData
+  // ) as OnChainProof;
+  // // const onchainProof = borsh.deserialize;
+
+  // // console.log("OnChainProof:", onchainProof);
+  // console.log("Public Values Length:", onchainProof.publicValues.length);
+  // console.log("Proof Length:", onchainProof.proof.length);
 
   it("It works!", async () => {
     const platformId = anchor.web3.PublicKey.unique();
@@ -114,12 +121,7 @@ describe("zk-bridge", () => {
         program.programId
       );
 
-    // let dataLeft = onchainProof.publicValues;
-    // CHECK: subarray doesn't work with out this, need fix
-    let dataLeft = new Uint8Array(onchainProof.publicValues.length);
-    for (let i = 0; i < onchainProof.publicValues.length; i++) {
-      dataLeft[i] = onchainProof.publicValues[i];
-    }
+    let dataLeft = commitData;
 
     let offset = 0;
     while (dataLeft.length > 0) {
@@ -127,7 +129,7 @@ describe("zk-bridge", () => {
       const size = Math.min(dataLeft.length, 800);
       await program.methods
         .uploadCommit({
-          commitSize: new anchor.BN(onchainProof.publicValues.length),
+          commitSize: new anchor.BN(commitData.length),
           offset: new anchor.BN(offset),
           commitData: Buffer.from(dataLeft.subarray(0, size)),
         })
@@ -143,8 +145,10 @@ describe("zk-bridge", () => {
       offset += size;
     }
 
+    console.log(`proving`);
+
     await program.methods
-      .prove(Buffer.from(onchainProof.proof))
+      .prove(Buffer.from(proofData))
       .accountsPartial({
         prover: senderKeypair.publicKey,
         commit: commitKey,
@@ -156,7 +160,7 @@ describe("zk-bridge", () => {
         }),
       ])
       .signers([senderKeypair])
-      .rpc({ skipPreflight: true });
+      .rpc();
   });
 });
 
