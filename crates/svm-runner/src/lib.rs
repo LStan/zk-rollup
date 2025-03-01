@@ -21,6 +21,8 @@ use solana_svm::{
         TransactionBatchProcessor, TransactionProcessingConfig, TransactionProcessingEnvironment,
     },
 };
+
+use solana_svm_transaction::svm_message::SVMMessage;
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, RwLock},
@@ -66,7 +68,7 @@ pub fn runner(input: &ExecutionInput) -> Result<RollupState, TransactionError> {
     let mut account_shared_data = HashMap::<Pubkey, AccountSharedData>::new();
 
     for (pk, account) in &input.accounts.0 {
-        account_shared_data.insert(*pk, account.clone().into());
+        account_shared_data.insert(*pk, account.clone());
     }
 
     // Process ramp txs
@@ -147,21 +149,52 @@ pub fn runner(input: &ExecutionInput) -> Result<RollupState, TransactionError> {
         &processing_config,
     );
 
-    // FIXME. For now only result of the first tx is used
-    let result = results.processing_results[0]
-        .as_ref()
-        .map_err(|e| e.clone())?;
-    match result {
-        ProcessedTransaction::Executed(executed_tx) => {
-            let accounts_shared = &executed_tx.loaded_transaction.accounts;
-            let accounts = accounts_shared
-                .iter()
-                .map(|(pubkey, account_shared)| (*pubkey, account_shared.clone().into()))
-                .collect();
-            Ok(RollupState(accounts))
+    for (tx_index, processed_transaction) in results.processing_results.iter().enumerate() {
+        let sanitized_transaction = &svm_transactions[tx_index];
+
+        match processed_transaction {
+            Ok(ProcessedTransaction::Executed(executed_transaction)) => {
+                for (index, (pubkey, account_data)) in executed_transaction
+                    .loaded_transaction
+                    .accounts
+                    .iter()
+                    .enumerate()
+                {
+                    if sanitized_transaction.is_writable(index) {
+                        account_loader
+                            .account_shared_data
+                            .write()
+                            .unwrap()
+                            .insert(*pubkey, account_data.clone());
+                    }
+                }
+            }
+            Ok(ProcessedTransaction::FeesOnly(fees_only_transaction)) => {
+                return Err(fees_only_transaction.load_error.clone())
+            }
+            Err(err) => return Err(err.clone()),
         }
-        ProcessedTransaction::FeesOnly(details) => Err(details.load_error.clone()),
     }
+
+    Ok(RollupState(
+        input
+            .accounts
+            .0
+            .iter()
+            .map(|state| {
+                (
+                    state.0.clone(),
+                    account_loader
+                        .account_shared_data
+                        .read()
+                        .unwrap()
+                        .get(&state.0)
+                        .unwrap()
+                        .clone(),
+                )
+            })
+            .collect(),
+    ))
 }
 
 pub(crate) fn get_transaction_check_results(
@@ -205,7 +238,8 @@ mod tests {
                         owner: solana_system_program::id(),
                         executable: false,
                         rent_epoch: 0,
-                    },
+                    }
+                    .into(),
                 ),
                 (
                     pk_receiver,
@@ -215,7 +249,8 @@ mod tests {
                         owner: solana_system_program::id(),
                         executable: false,
                         rent_epoch: 0,
-                    },
+                    }
+                    .into(),
                 ),
             ]),
             txs: vec![Transaction::new_signed_with_payer(

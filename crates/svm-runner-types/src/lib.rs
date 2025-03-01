@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use solana_sdk::{
-    account::Account,
+    account::{Account, AccountSharedData},
     hash::{hashv, Hash},
     pubkey::Pubkey,
     transaction::Transaction,
@@ -23,7 +23,7 @@ pub struct ExecutionInput {
 pub type ExecutionOutput = Hash;
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct RollupState(pub Vec<(Pubkey, Account)>); // Change Account to AccountSharedData ?
+pub struct RollupState(pub Vec<(Pubkey, AccountSharedData)>);
 
 // Temporary function used before adding the merklized state
 pub fn hash_state(output: RollupState) -> Hash {
@@ -39,16 +39,23 @@ impl Into<onchain_types::RollupState> for RollupState {
     fn into(self) -> onchain_types::RollupState {
         let data = self
             .0
-            .iter()
+            .into_iter()
             .map(|(pk, account)| {
+                let Account {
+                    lamports,
+                    data,
+                    owner,
+                    executable,
+                    rent_epoch,
+                } = account.into();
                 (
                     onchain_types::Pubkey(pk.to_bytes()),
                     onchain_types::Account {
-                        lamports: account.lamports,
-                        data: account.data.to_vec(),
-                        owner: onchain_types::Pubkey(account.owner.to_bytes()),
-                        executable: account.executable,
-                        rent_epoch: account.rent_epoch,
+                        lamports,
+                        data,
+                        owner: onchain_types::Pubkey(owner.to_bytes()),
+                        executable,
+                        rent_epoch,
                     },
                 )
             })

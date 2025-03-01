@@ -7382,6 +7382,7 @@ dependencies = [
  "solana-program-runtime",
  "solana-sdk",
  "solana-svm",
+ "solana-svm-transaction",
  "solana-system-program",
  "svm-runner-types",
 ]

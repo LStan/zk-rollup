@@ -147,7 +147,8 @@ fn create_test_input() -> ExecutionInput {
                     owner: system_program::id(),
                     executable: false,
                     rent_epoch: 0,
-                },
+                }
+                .into(),
             ),
             (
                 pk_receiver,
@@ -157,7 +158,8 @@ fn create_test_input() -> ExecutionInput {
                     owner: system_program::id(),
                     executable: false,
                     rent_epoch: 0,
-                },
+                }
+                .into(),
             ),
         ]),
         txs: vec![Transaction::new_signed_with_payer(
