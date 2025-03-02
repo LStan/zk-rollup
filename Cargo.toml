@@ -27,6 +27,7 @@ solana-bpf-loader-program = "=2.2.0"
 solana-compute-budget = "=2.2.0"
 solana-system-program = "=2.2.0"
 solana-svm-transaction = "=2.2.0"
+solana-loader-v4-program = "=2.2.0"
 
 [patch.crates-io]
 solana-secp256r1-program = { git = "https://github.com/LStan/svm-patches" }

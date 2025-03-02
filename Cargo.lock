@@ -7379,6 +7379,7 @@ version = "0.1.0"
 dependencies = [
  "solana-bpf-loader-program",
  "solana-compute-budget",
+ "solana-loader-v4-program",
  "solana-program-runtime",
  "solana-sdk",
  "solana-svm",

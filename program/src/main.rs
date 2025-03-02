@@ -10,6 +10,8 @@ pub fn main() {
 
     let output = runner(&input).unwrap();
 
+    println!("output: {:?}", output);
+
     // Commit to the input and output
     let commit = CommittedValues {
         input: input.into(),

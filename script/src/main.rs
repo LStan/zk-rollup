@@ -1,11 +1,24 @@
 use clap::Parser;
 use onchain_types::CommittedValues;
 use solana_sdk::{
-    account::Account, hash::Hash, native_token::LAMPORTS_PER_SOL, signature::Keypair,
-    signer::Signer, system_instruction, system_program, transaction::Transaction,
+    account::{Account, AccountSharedData, WritableAccount},
+    hash::Hash,
+    instruction::{AccountMeta, Instruction, InstructionError},
+    loader_v4::{self, LoaderV4State, LoaderV4Status},
+    native_token::LAMPORTS_PER_SOL,
+    pubkey::Pubkey,
+    rent::Rent,
+    signature::Keypair,
+    signer::Signer,
+    system_instruction, system_program,
+    transaction::Transaction,
 };
 use sp1_sdk::{include_elf, HashableKey, ProverClient, SP1Stdin};
-use std::{io::Write, vec};
+use std::{
+    fs::File,
+    io::{Read, Write},
+    vec,
+};
 use svm_runner_types::{hash_state, ExecutionInput, RampTx, RollupState};
 
 pub const ZK_SVM_ELF: &[u8] = include_elf!("zk-svm-program");
@@ -137,6 +150,27 @@ fn create_test_input() -> ExecutionInput {
     let pk_receiver = kp_receiver.pubkey();
     let pk_sender = kp_sender.pubkey();
 
+    let counter_program_id = Keypair::new().pubkey();
+    let pk_counter = Keypair::new().pubkey();
+
+    let path = "../counter-program/counter_program.so";
+    let mut file = File::open(path).expect("file open failed");
+    let mut elf_bytes = Vec::new();
+    file.read_to_end(&mut elf_bytes).unwrap();
+    let rent = Rent::default();
+    let account_size = LoaderV4State::program_data_offset().saturating_add(elf_bytes.len());
+    let mut program_account = AccountSharedData::new(
+        rent.minimum_balance(account_size),
+        account_size,
+        &loader_v4::id(),
+    );
+    let state = get_state_mut(program_account.data_as_mut_slice()).unwrap();
+    state.slot = 0;
+    state.authority_address_or_next_version = Pubkey::new_unique();
+    state.status = LoaderV4Status::Deployed;
+    program_account.data_as_mut_slice()[LoaderV4State::program_data_offset()..]
+        .copy_from_slice(&elf_bytes);
+
     ExecutionInput {
         accounts: RollupState(vec![
             (
@@ -161,22 +195,60 @@ fn create_test_input() -> ExecutionInput {
                 }
                 .into(),
             ),
+            (counter_program_id, program_account),
+            (
+                pk_counter,
+                Account {
+                    lamports: 100000,
+                    data: vec![0, 0, 0, 0],
+                    owner: counter_program_id,
+                    executable: false,
+                    rent_epoch: 0,
+                }
+                .into(),
+            ),
         ]),
-        txs: vec![Transaction::new_signed_with_payer(
-            &[system_instruction::transfer(
-                &pk_sender,
-                &pk_receiver,
-                LAMPORTS_PER_SOL,
-            )],
-            Some(&pk_sender),
-            &[&kp_sender],
-            Hash::new_from_array([7; 32]),
-        )],
+        txs: vec![
+            Transaction::new_signed_with_payer(
+                &[system_instruction::transfer(
+                    &pk_sender,
+                    &pk_receiver,
+                    LAMPORTS_PER_SOL,
+                )],
+                Some(&pk_sender),
+                &[&kp_sender],
+                Hash::new_from_array([7; 32]),
+            ),
+            Transaction::new_signed_with_payer(
+                &[Instruction {
+                    program_id: counter_program_id,
+                    accounts: vec![AccountMeta::new(pk_counter, false)],
+                    data: vec![],
+                }],
+                Some(&pk_sender),
+                &[&kp_sender],
+                Hash::new_from_array([7; 32]),
+            ),
+        ],
         ramp_txs: vec![RampTx {
             is_onramp: true,
             user: pk_sender,
             amount: 10 * LAMPORTS_PER_SOL,
         }],
+    }
+}
+
+fn get_state_mut(data: &mut [u8]) -> Result<&mut LoaderV4State, InstructionError> {
+    unsafe {
+        let data = data
+            .get_mut(0..LoaderV4State::program_data_offset())
+            .ok_or(InstructionError::AccountDataTooSmall)?
+            .try_into()
+            .unwrap();
+        Ok(std::mem::transmute::<
+            &mut [u8; LoaderV4State::program_data_offset()],
+            &mut LoaderV4State,
+        >(data))
     }
 }
 
