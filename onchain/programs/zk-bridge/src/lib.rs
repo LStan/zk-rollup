@@ -33,4 +33,9 @@ pub mod zk_bridge {
     pub fn prove(ctx: Context<Prove>, proof: Vec<u8>) -> Result<()> {
         Prove::handle(ctx, proof)
     }
+
+    #[access_control(ctx.accounts.validate())]
+    pub fn withdraw(ctx: Context<Withdraw>, args: WithdrawArgs) -> Result<()> {
+        Withdraw::handle(ctx, args)
+    }
 }
